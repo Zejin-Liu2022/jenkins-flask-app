@@ -41,4 +41,4 @@ Jenkins 和演示应用均只监听本机。此实验没有配置 SMTP 邮件通
 
 修改此文件的演示标记并提交到 main，等待 SCM 轮询触发构建。构建成功后，`/health` 的 revision 应与该次 Git 提交相同。
 
-演示标记：initial
+演示标记：automatic-trigger-verified
