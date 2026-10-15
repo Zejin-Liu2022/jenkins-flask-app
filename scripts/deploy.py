@@ -18,7 +18,7 @@ def launchctl(*arguments, check=True):
 
 def main():
     root = Path(os.environ["DEMO_DEPLOY_ROOT"]).resolve()
-    revision = os.environ["GIT_COMMIT"]
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     build_number = os.environ["BUILD_NUMBER"]
     release = root / "releases" / f"{build_number}-{revision[:12]}"
     release.mkdir(parents=True, exist_ok=True)
