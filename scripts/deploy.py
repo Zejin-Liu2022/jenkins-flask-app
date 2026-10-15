@@ -11,9 +11,30 @@ import urllib.request
 
 
 def launchctl(*arguments, check=True):
-    return subprocess.run(
-        ["/bin/launchctl", *arguments], check=check, capture_output=True, text=True
+    result = subprocess.run(
+        ["/bin/launchctl", *arguments], check=False, capture_output=True, text=True
     )
+    if check and result.returncode:
+        raise RuntimeError(f"launchctl {arguments}: {result.stderr.strip()}")
+    return result
+
+
+def unload_service(service):
+    launchctl("bootout", service, check=False)
+    for _ in range(75):
+        if launchctl("print", service, check=False).returncode != 0:
+            return
+        time.sleep(0.2)
+    raise RuntimeError(f"Timed out waiting for the previous service to unload: {service}")
+
+
+def load_service(domain, plist):
+    for _ in range(30):
+        result = launchctl("bootstrap", domain, str(plist), check=False)
+        if result.returncode == 0:
+            return
+        time.sleep(0.5)
+    raise RuntimeError(f"Could not load application service: {result.stderr.strip()}")
 
 
 def main():
@@ -47,9 +68,9 @@ def main():
     }
     try:
         plist.write_bytes(plistlib.dumps(configuration))
-        launchctl("bootout", service, check=False)
-        launchctl("bootstrap", domain, str(plist))
-        deadline = time.monotonic() + 45
+        unload_service(service)
+        load_service(domain, plist)
+        deadline = time.monotonic() + 90
         last_error = None
         while time.monotonic() < deadline:
             try:
@@ -67,10 +88,10 @@ def main():
                 time.sleep(1)
         raise RuntimeError(f"Deployment health check failed: {last_error}")
     except Exception:
-        launchctl("bootout", service, check=False)
+        unload_service(service)
         if previous_plist:
             plist.write_bytes(previous_plist)
-            launchctl("bootstrap", domain, str(plist), check=False)
+            load_service(domain, plist)
             print("Restored previous application service.")
         raise
 
